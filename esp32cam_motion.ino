@@ -131,6 +131,38 @@ void print_frame(uint16_t frame[H][W]) {
   delay(2000);
 }
 
+int start_wifi(){
+  Serial.printf("connecting to %s\n",ssid);
+  int cur_ssid = 0;
+  Serial.println(WiFi.macAddress());
+  if (cur_ssid == 0) {
+        WiFi.begin(ssid_alt, password_alt);
+        Serial.printf("connecting to %s\n",ssid_alt);
+      } else {
+        WiFi.begin(ssid, password);
+        Serial.printf("connecting to %s\n",ssid);
+      }
+  int tries = 0;
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    if (tries > 15) {
+      WiFi.disconnect();
+      tries = 0;
+      if (cur_ssid == 0) {
+        cur_ssid = 1;
+        WiFi.begin(ssid_alt, password_alt);
+        Serial.printf("connecting to %s\n",ssid_alt);
+      } else {
+        cur_ssid = 0;
+        WiFi.begin(ssid, password);
+        Serial.printf("connecting to %s\n",ssid);
+      }
+    }
+    Serial.print(".");
+    tries++;
+  }
+}
+
 void setup() {
   //uint16_t _prev_frame[H][W];
   //uint16_t _current_frame[H][W];
@@ -157,6 +189,8 @@ void setup() {
   //print_frame(prev_frame);
 
   // Wi-Fi connection
+  start_wifi();
+  /*
   Serial.printf("connecting to %s\n",ssid);
   int cur_ssid = 0;
   Serial.println(WiFi.macAddress());
@@ -168,7 +202,6 @@ void setup() {
         Serial.printf("connecting to %s\n",ssid);
       }
   //WiFi.begin(ssid, password);
-  WiFi.setSleep(false);
   int tries = 0;
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
@@ -187,7 +220,8 @@ void setup() {
     }
     Serial.print(".");
     tries++;
-  }
+  } */
+  WiFi.setSleep(false);
 
   Serial.println("");
   Serial.println("WiFi connected");
@@ -724,6 +758,9 @@ void loop() {
 
   }
   if ( (millis() - timer_status) > status_limit ) {
+      if (WiFi.status() != WL_CONNECTED){
+        start_wifi();
+      }
       Serial.println("Notify");
       status_notify();
       timer_status = millis();
