@@ -56,12 +56,12 @@ const char *ssid_alt = "";
 const char *password_alt = "";
 const char *status_str = "aqua_pir";
 
-const char *post_url = "http://moraesalvarez.com/aquariuscam/in.php?pic=motion_detect"; // Location where images are POSTED
-const char *status_url = "http://moraesalvarez.com/aquariuscam/in.php?pic=status";
-const char *orders_url = "http://moraesalvarez.com/aquariuscam/in.php?pic=orders";
-const char *motion_url = "http://moraesalvarez.com/aquariuscam/in.php?pic=motion_debug";
-const char *bg_url = "http://moraesalvarez.com/aquariuscam/in.php?pic=motion_debug_bg";
-const char *led_url = "http://moraesalvarez.com/aquariuscam/in.php?pic=led";
+const char *post_url = "http://site/in.php?pic=motion_detect"; // Location where images are POSTED
+const char *status_url = "http://site/in.php?pic=status";
+const char *orders_url = "http://site/in.php?pic=orders";
+const char *motion_url = "http://site/in.php?pic=motion_debug";
+const char *bg_url = "http://site/in.php?pic=motion_debug_bg";
+const char *led_url = "http://site/in.php?pic=led";
 
 
 #define CAMERA_MODEL_AI_THINKER
