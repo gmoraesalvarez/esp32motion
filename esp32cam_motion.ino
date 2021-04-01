@@ -50,10 +50,10 @@ int program = 1;
 camera_fb_t *frame_buffer = NULL;
 
 //Replace with your network credentials
-const char *ssid = "Banana";
-const char *password = "supersenhadanat";
-const char *ssid_alt = "Redmi";
-const char *password_alt = "meteoro2";
+const char *ssid = "";
+const char *password = "";
+const char *ssid_alt = "";
+const char *password_alt = "";
 const char *status_str = "aqua_pir";
 
 const char *post_url = "http://moraesalvarez.com/aquariuscam/in.php?pic=motion_detect"; // Location where images are POSTED
