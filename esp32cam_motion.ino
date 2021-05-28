@@ -1,23 +1,29 @@
 #include "esp_camera.h"
 #include "WiFi.h"
+#include "avi.h"
 #include "soc/soc.h" //disable brownout problems
 #include "soc/rtc_cntl_reg.h"  //disable brownout problems
 #include "esp_http_client.h"
-#define JPEG 0
+//#include "FS.h"
+//#include "SPIFFS.h"
+#define JPEG 1
 #define BMP 0
-#define MOTION_DETECT 0
-#define PIR 1
+#define MOTION_DETECT 1
+#define PIR 0
 #if JPEG
   #include "JPEGDEC.h"
   JPEGDEC jpeg;
 #endif
-
+/* You only need to format SPIFFS the first time you run a
+   test or else use the SPIFFS plugin to create a partition
+   https://github.com/me−no−dev/arduino−esp32fs−plugin */
+//#define FORMAT_SPIFFS_IF_FAILED true
 #define FRAME_SIZE_COMP FRAMESIZE_QVGA
 #define FRAME_SIZE_SEND FRAMESIZE_UXGA
 #define FRAME_SIZE_TEST FRAMESIZE_XGA
-#define WIDTH 1600
-#define HEIGHT 1200
-#define BLOCK_SIZE 25  // that's X*X pixels
+#define WIDTH 1024
+#define HEIGHT 768
+#define BLOCK_SIZE 16  // that's X*X pixels
 //#define SAMPLES_COUNT 48 // should be at most half the block size squared. should fit accumulated pixel values in the chosen var type
 #define W (WIDTH / BLOCK_SIZE)
 #define H (HEIGHT / BLOCK_SIZE)
@@ -48,7 +54,6 @@ String cur_frame_s = "";
 int program = 1;
 
 camera_fb_t *frame_buffer = NULL;
-
 //Replace with your network credentials
 const char *ssid = "";
 const char *password = "";
@@ -120,6 +125,35 @@ bool setup_camera(framesize_t frameSize, pixformat_t pixFormat) {
   return ok;
 }
 
+/*void writeFile(fs::FS &fs, const char * path, const char * message){
+   Serial.printf("Writing file: %s\r\n", path);
+
+   File file = fs.open(path, FILE_WRITE);
+   if(!file){
+      Serial.println("− failed to open file for writing");
+      return;
+   }
+   if(file.print(message)){
+      Serial.println("− file written");
+   }else {
+      Serial.println("− frite failed");
+   }
+}
+void appendFile(fs::FS &fs, const char * path, const char * message){
+   Serial.printf("Appending to file: %s\r\n", path);
+
+   File file = fs.open(path, FILE_APPEND);
+   if(!file){
+      Serial.println("− failed to open file for appending");
+      return;
+   }
+   if(file.print(message)){
+      Serial.println("− message appended");
+   } else {
+      Serial.println("− append failed");
+   }
+}
+*/
 void print_frame(uint16_t frame[H][W]) {
   for (int y = 0; y < H; y++) {
     for (int x = 0; x < W; x++) {
@@ -133,9 +167,11 @@ void print_frame(uint16_t frame[H][W]) {
 
 int start_wifi(){
   Serial.printf("connecting to %s\n",ssid);
+  WiFi.config(INADDR_NONE, INADDR_NONE, INADDR_NONE);
+  WiFi.setHostname(hostname);
   int cur_ssid = 0;
   Serial.println(WiFi.macAddress());
-  if (cur_ssid == 0) {
+  if (cur_ssid == 1) {
         WiFi.begin(ssid_alt, password_alt);
         Serial.printf("connecting to %s\n",ssid_alt);
       } else {
@@ -147,6 +183,8 @@ int start_wifi(){
     delay(500);
     if (tries > 15) {
       WiFi.disconnect();
+      WiFi.config(INADDR_NONE, INADDR_NONE, INADDR_NONE);
+      WiFi.setHostname(hostname);
       tries = 0;
       if (cur_ssid == 0) {
         cur_ssid = 1;
@@ -164,6 +202,10 @@ int start_wifi(){
 }
 
 void setup() {
+  //if(!SPIFFS.begin(FORMAT_SPIFFS_IF_FAILED)){
+  //    Serial.println("SPIFFS Mount Failed");
+  //    return;
+  // }
   //uint16_t _prev_frame[H][W];
   //uint16_t _current_frame[H][W];
   //prev_frame[H][W] = _prev_frame[H][W];
@@ -177,7 +219,7 @@ void setup() {
   Serial.begin(115200);
   Serial.setDebugOutput(false);
   Serial.printf("DIFF THRESH =  %.2f\n",BLOCK_DIFF_THRESHOLD);
-  Serial.println(setup_camera(FRAME_SIZE_SEND, PIXFORMAT_JPEG) ? "CAMERA INITIAL SETUP OK" : "ERR INIT");
+  Serial.println(setup_camera(FRAME_SIZE_TEST, PIXFORMAT_JPEG) ? "CAMERA INITIAL SETUP OK" : "ERR INIT");
 
   //frame_buffer = esp_camera_fb_get();
   //esp_camera_fb_return(frame_buffer); // release framebuffer immediately
@@ -190,37 +232,7 @@ void setup() {
 
   // Wi-Fi connection
   start_wifi();
-  /*
-  Serial.printf("connecting to %s\n",ssid);
-  int cur_ssid = 0;
-  Serial.println(WiFi.macAddress());
-  if (cur_ssid == 0) {
-        WiFi.begin(ssid_alt, password_alt);
-        Serial.printf("connecting to %s\n",ssid_alt);
-      } else {
-        WiFi.begin(ssid, password);
-        Serial.printf("connecting to %s\n",ssid);
-      }
-  //WiFi.begin(ssid, password);
-  int tries = 0;
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    if (tries > 15) {
-      WiFi.disconnect();
-      tries = 0;
-      if (cur_ssid == 0) {
-        cur_ssid = 1;
-        WiFi.begin(ssid_alt, password_alt);
-        Serial.printf("connecting to %s\n",ssid_alt);
-      } else {
-        cur_ssid = 0;
-        WiFi.begin(ssid, password);
-        Serial.printf("connecting to %s\n",ssid);
-      }
-    }
-    Serial.print(".");
-    tries++;
-  } */
+
   WiFi.setSleep(false);
 
   Serial.println("");
@@ -384,23 +396,11 @@ bool capture_still() {
   //int start = millis();
   frame_buffer = esp_camera_fb_get();
   //camera_fb_t *frame_buffer = esp_camera_fb_get();
+  //Serial.println((char *)frame_buffer->buf);
   if (!frame_buffer)
     return false;
   //int finish = millis() - start;
   //Serial.printf("Pic taking took %d \n", finish);  
-
-#if BMP
-  downsample_bmp();
-#endif
-#if JPEG
-  downsample_jpeg();
-#endif
-
-#if DEBUG
-  Serial.println("Current frame:");
-  print_frame(current_frame);
-  Serial.println("---------------");
-#endif
 
   return true;
 }
@@ -571,6 +571,128 @@ static esp_err_t send_photo()
   esp_http_client_cleanup(http_client);
 
 }
+
+
+int send_clip()
+{
+  uint8_t* clientBuf;
+  int megabytes = 1024*1024*3;
+  clientBuf = (uint8_t*)ps_malloc(megabytes); // allocate some memory for the frames
+
+  int frameCnt = 0;
+  int maxframeCnt = 300; // this could be as big as the psram allows
+  word fileSize;
+  fileSize = 240; // this is an index to add the frame data after the avi header
+  memcpy(clientBuf, aviHeader, fileSize); // copy the avi header template (240 bytes)
+
+  word jpegSize[maxframeCnt]; // this array will store the size of each frame
+  //Serial.println("mpeg size");
+  //Serial.println(fileSize);
+
+  for (int i = 0;i < maxframeCnt; i++){
+    frameCnt++;
+    if (!capture_still()) {
+      Serial.println("Failed capture");
+      delay(3000);
+      return 0;
+    }
+    jpegSize[i] = frame_buffer->len;
+
+		const char* dwFourCC = "00db";  // this and the frame size in bytes goes in between every frame
+    memcpy(clientBuf+fileSize, dwFourCC, 4);
+
+    fileSize += 4;
+
+    memcpy(clientBuf+fileSize, &jpegSize[i], 4);
+    fileSize += 4;
+
+    memcpy(clientBuf+fileSize, frame_buffer->buf, jpegSize[i]); // copy the framebuffer data to the avi memory we allocated
+    fileSize += jpegSize[i];
+
+    int headroom = jpegSize[i] * 2;
+    if ( fileSize > (megabytes - headroom) ){ break; }  // break the photo capture around 2 framesizes before the end of allocated memory
+    //Serial.println("mpeg size");
+    //Serial.println(fileSize);
+    //Serial.println("--> next frame");
+  }
+  esp_camera_fb_return(frame_buffer); // release the last framebuffer
+  Serial.println("released frame_buffer last time");
+  frame_buffer = NULL;
+
+  // these commands will replace the relevant data in the header
+  word jpgs_width = WIDTH;
+	word jpgs_height = HEIGHT;
+
+  word dwSize = fileSize - 8;
+  memcpy(clientBuf+4, &dwSize, 4);
+  dwSize = fileSize - 20;
+  memcpy(clientBuf+16, &dwSize, 4);
+  word dwTotalFrames = frameCnt;
+  memcpy(clientBuf+48, &dwTotalFrames, 4);
+  memcpy(clientBuf+64, &jpgs_width, 4);
+  memcpy(clientBuf+68, &jpgs_height, 4);
+  memcpy(clientBuf+140, &dwTotalFrames, 4);
+  memcpy(clientBuf+168, &jpgs_width, 4);
+  memcpy(clientBuf+172, &jpgs_height, 4);
+  word biSizeImage = ((jpgs_width*24/8 + 3)&0xFFFFFFFC)*jpgs_height;
+  memcpy(clientBuf+184, &jpgs_height, 4);
+  memcpy(clientBuf+224, &dwTotalFrames, 4);
+  dwSize = fileSize - 232;
+  memcpy(clientBuf+236, &dwSize, 4);
+  
+  // these commands will create the index in the end of the avi buffer;
+  const char* dwFourCC = "idx1";
+  memcpy(clientBuf+fileSize, dwFourCC, 4);
+  fileSize += 4;
+  word index_length = 4*4*frameCnt;
+  memcpy(clientBuf+fileSize, &index_length, 4);
+
+  unsigned long AVI_KEYFRAME = 16;
+	unsigned long offset_count = 4;
+  dwFourCC = "00db";
+  for (int i=0;i<frameCnt;i++){
+    fileSize += 4;
+    memcpy(clientBuf+fileSize, dwFourCC, 4);
+    fileSize += 4;
+    memcpy(clientBuf+fileSize, &AVI_KEYFRAME, 4);
+    fileSize += 4;
+    memcpy(clientBuf+fileSize, &offset_count, 4);
+    fileSize += 4;
+    memcpy(clientBuf+fileSize, &jpegSize[i], 4);
+    offset_count += jpegSize[i]+8;
+  }
+
+  Serial.println("frames captured");
+  Serial.println(frameCnt);
+  Serial.println("avi size"); // hopefully everything fits the allocated memory
+  Serial.println(fileSize);
+
+  esp_http_client_handle_t http_client;
+
+  esp_http_client_config_t config_client = {0};
+  config_client.url = mjpeg_url;
+  config_client.event_handler = _http_event_handler;
+  config_client.method = HTTP_METHOD_POST;
+
+  http_client = esp_http_client_init(&config_client);
+  
+  esp_http_client_set_post_field(http_client, (char *)clientBuf, fileSize);
+
+  esp_http_client_set_header(http_client, "Content-Type", "video/x-motion-jpeg");
+
+  esp_err_t err = esp_http_client_perform(http_client);
+
+  if (err == ESP_OK) {
+    Serial.print("esp_http_client_get_status_code: ");
+    Serial.println(esp_http_client_get_status_code(http_client));
+  }
+
+  esp_http_client_cleanup(http_client);
+
+  free(clientBuf); // gotta free those megabytes
+  return 1;
+}
+
 int send_motion()
 {
   esp_http_client_handle_t http_client;
@@ -679,12 +801,27 @@ void loop() {
       delay(3000);
       return;
     }
+    else {
+      #if BMP
+        downsample_bmp();
+      #endif
+      #if JPEG
+        downsample_jpeg();
+      #endif
+
+      #if DEBUG
+        Serial.println("Current frame:");
+        print_frame(current_frame);
+        Serial.println("---------------");
+      #endif
+    }
 
     if (motion_detect()) {
       Serial.println("Motion detected");
-      send_photo();
-      send_motion();
-      send_background();
+      send_clip();
+      //send_photo();
+      //send_motion();
+      //send_background();
       //delay(1000);
     }
     if ( (millis() - timer_bg) > bg_limit) {
@@ -772,4 +909,3 @@ void loop() {
     timer_orders = millis();
   }
 #endif
-}
