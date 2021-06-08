@@ -54,6 +54,19 @@ String cur_frame_s = "";
 int program = 1;
 
 camera_fb_t *frame_buffer = NULL;
+
+//// send_clip variables reused across loops and global to avoid stack smashing error
+int megabytes = 1024*1024*8;   // max file size (has to fit psram if sending full clip)
+uint8_t* clientBuf[500];
+uint8_t* idxBuf[5000];
+int frameCnt = 0;
+const int maxframeCnt = 200; // this could be as big as the psram allows if full clip in memory
+                          // or any value that the backend allows if chunked streaming
+word fileSize = 240; // this is the position to add the frame data after the avi header
+word idxbufSize = 0;
+word jpegSize[maxframeCnt]; // this array will store the size of each frame
+
+
 //Replace with your network credentials
 const char *ssid = "";
 const char *password = "";
