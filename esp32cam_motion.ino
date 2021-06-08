@@ -573,51 +573,77 @@ static esp_err_t send_photo()
 }
 
 
-int send_clip()
+void send_clip()
 {
-  uint8_t* clientBuf;
-  int megabytes = 1024*1024*3;
-  clientBuf = (uint8_t*)ps_malloc(megabytes); // allocate some memory for the frames
 
-  int frameCnt = 0;
-  int maxframeCnt = 300; // this could be as big as the psram allows
-  word fileSize;
-  fileSize = 240; // this is an index to add the frame data after the avi header
-  memcpy(clientBuf, aviHeader, fileSize); // copy the avi header template (240 bytes)
+  Serial.println("--");
+  Serial.println("SEND THEM CHUNKS");
+  esp_http_client_config_t chunk_config = {0};
+  chunk_config.event_handler = _http_event_handler;
+  chunk_config.url = mjpeg_url;
+  chunk_config.method = HTTP_METHOD_POST;
 
-  word jpegSize[maxframeCnt]; // this array will store the size of each frame
-  //Serial.println("mpeg size");
-  //Serial.println(fileSize);
+	esp_http_client_handle_t chunk_client = esp_http_client_init(&chunk_config);
 
+  esp_http_client_set_header(chunk_client, "Content-Type", "video/x-motion-jpeg");
+  esp_http_client_set_header(chunk_client, "Transfer-Encoding", "chunked");
+
+	esp_err_t err = esp_http_client_open(chunk_client, -1); // write_len=-1 sets header "Transfer-Encoding: chunked" and method to POST
+	if (err != ESP_OK) {
+		ESP_LOGE(TAG, "Failed to open HTTP connection: %s", esp_err_to_name(err));
+		//return 0;
+    return;
+	}
+
+  Serial.println("connected");
+
+  ////////////////////////////////////////////////////////////////////////////////
+  fileSize = 240; // have to reset this every new clip
+  memcpy(clientBuf, aviHeader, fileSize); // copy the avi header template (240 bytes), have to do it every new clip
+
+  int headroom = 200000;
+  frameCnt = 0; // gotta reset this too
+  const char* dwFourCC = "00db";  // this and the frame size in bytes goes in between every frame
+  char chunk_size_char[16];
+  Serial.println("capturing");
   for (int i = 0;i < maxframeCnt; i++){
     frameCnt++;
-    if (!capture_still()) {
-      Serial.println("Failed capture");
-      delay(3000);
-      return 0;
-    }
+
+    capture_still();
+
     jpegSize[i] = frame_buffer->len;
-
-		const char* dwFourCC = "00db";  // this and the frame size in bytes goes in between every frame
-    memcpy(clientBuf+fileSize, dwFourCC, 4);
-
+    
+    esp_http_client_write(chunk_client,"4", 1); // length
+    esp_http_client_write(chunk_client,"\r\n", 2);
+    esp_http_client_write(chunk_client, dwFourCC, 4); // data
+    esp_http_client_write(chunk_client,"\r\n", 2);
+    //Serial.println("sent fourcc");
     fileSize += 4;
 
-    memcpy(clientBuf+fileSize, &jpegSize[i], 4);
+    esp_http_client_write(chunk_client,"4", 1); // length
+    esp_http_client_write(chunk_client,"\r\n", 2);
+    esp_http_client_write(chunk_client, (char*)&jpegSize[i], 4); // data 
+    esp_http_client_write(chunk_client,"\r\n", 2);
+    //Serial.print("sent length: ");
+    //Serial.println((char*)&jpegSize[i]);
     fileSize += 4;
 
-    memcpy(clientBuf+fileSize, frame_buffer->buf, jpegSize[i]); // copy the framebuffer data to the avi memory we allocated
+    sprintf(chunk_size_char,"%08X",jpegSize[i]);
+    //Serial.println(jpegSize[i]);
+    //Serial.print("format size: ");
+    //Serial.println(chunk_size_char);
+    esp_http_client_write(chunk_client,chunk_size_char, 8); // length
+    esp_http_client_write(chunk_client,"\r\n", 2);
+    esp_http_client_write(chunk_client,(char*)frame_buffer->buf, jpegSize[i]); // data   , 
+    esp_http_client_write(chunk_client,"\r\n", 2);
+    Serial.print("sent frame: ");
+    Serial.println(i);
     fileSize += jpegSize[i];
 
-    int headroom = jpegSize[i] * 2;
+    headroom = jpegSize[i] * 2;
     if ( fileSize > (megabytes - headroom) ){ break; }  // break the photo capture around 2 framesizes before the end of allocated memory
-    //Serial.println("mpeg size");
-    //Serial.println(fileSize);
-    //Serial.println("--> next frame");
+    
   }
-  esp_camera_fb_return(frame_buffer); // release the last framebuffer
-  Serial.println("released frame_buffer last time");
-  frame_buffer = NULL;
 
   // these commands will replace the relevant data in the header
   word jpgs_width = WIDTH;
@@ -639,58 +665,72 @@ int send_clip()
   memcpy(clientBuf+224, &dwTotalFrames, 4);
   dwSize = fileSize - 232;
   memcpy(clientBuf+236, &dwSize, 4);
-  
+
   // these commands will create the index in the end of the avi buffer;
-  const char* dwFourCC = "idx1";
-  memcpy(clientBuf+fileSize, dwFourCC, 4);
-  fileSize += 4;
   word index_length = 4*4*frameCnt;
-  memcpy(clientBuf+fileSize, &index_length, 4);
+  
+  idxbufSize = 0;
+  dwFourCC = "idx1";
+  memcpy(idxBuf+idxbufSize, dwFourCC, 4);
+  idxbufSize += 4;
+  memcpy(idxBuf+idxbufSize, &index_length, 4);
 
   unsigned long AVI_KEYFRAME = 16;
 	unsigned long offset_count = 4;
   dwFourCC = "00db";
   for (int i=0;i<frameCnt;i++){
-    fileSize += 4;
-    memcpy(clientBuf+fileSize, dwFourCC, 4);
-    fileSize += 4;
-    memcpy(clientBuf+fileSize, &AVI_KEYFRAME, 4);
-    fileSize += 4;
-    memcpy(clientBuf+fileSize, &offset_count, 4);
-    fileSize += 4;
-    memcpy(clientBuf+fileSize, &jpegSize[i], 4);
+    idxbufSize += 4;
+    memcpy(idxBuf+idxbufSize, dwFourCC, 4);
+    idxbufSize += 4;
+    memcpy(idxBuf+idxbufSize, &AVI_KEYFRAME, 4);
+    idxbufSize += 4;
+    memcpy(idxBuf+idxbufSize, &offset_count, 4);
+    idxbufSize += 4;
+    memcpy(idxBuf+idxbufSize, &jpegSize[i], 4);
     offset_count += jpegSize[i]+8;
   }
+  fileSize += idxbufSize;                         // this is part of that
+
+  /// sending avi index chunk. this should end the file after the backend code moves the header to the head.
+  char chunk_indexsize_char[8];
+  sprintf(chunk_indexsize_char,"%08X", idxbufSize);
+  esp_http_client_write(chunk_client,chunk_indexsize_char, 8); // length
+  esp_http_client_write(chunk_client,"\r\n", 2);
+  esp_http_client_write(chunk_client,(char*)idxBuf, idxbufSize); // data 
+  esp_http_client_write(chunk_client,"\r\n", 2);
+
+  /// sending the header chunk to the end of the file. Server side code will have to deal with
+  /// putting it on the head
+  char chunk_headsize_char[8];
+  sprintf(chunk_headsize_char,"%08X", 240); //header size is 240 bytes
+  esp_http_client_write(chunk_client,chunk_headsize_char, 8); // length
+  esp_http_client_write(chunk_client,"\r\n", 2);
+  esp_http_client_write(chunk_client,(char*)clientBuf, 240); // data 
+  esp_http_client_write(chunk_client,"\r\n", 2);
 
   Serial.println("frames captured");
   Serial.println(frameCnt);
   Serial.println("avi size"); // hopefully everything fits the allocated memory
   Serial.println(fileSize);
 
-  esp_http_client_handle_t http_client;
-
-  esp_http_client_config_t config_client = {0};
-  config_client.url = mjpeg_url;
-  config_client.event_handler = _http_event_handler;
-  config_client.method = HTTP_METHOD_POST;
-
-  http_client = esp_http_client_init(&config_client);
+  //  finish the chunked stream
+	esp_http_client_write(chunk_client,"0", 1);  // end
+	esp_http_client_write(chunk_client,"\r\n", 2);
+	esp_http_client_write(chunk_client,"\r\n", 2);
   
-  esp_http_client_set_post_field(http_client, (char *)clientBuf, fileSize);
+  Serial.println("sent end of stream");
+  Serial.println();
+  Serial.print("esp_http_client_fetch_headers: ");
+	Serial.println(esp_http_client_fetch_headers(chunk_client)); //for content length
+  Serial.print("esp_http_client_get_status_code: ");
+	Serial.println(esp_http_client_get_status_code(chunk_client));
+  Serial.println();
+	//	esp_http_client_read()
+	esp_http_client_close(chunk_client);
+	esp_http_client_cleanup(chunk_client);
 
-  esp_http_client_set_header(http_client, "Content-Type", "video/x-motion-jpeg");
-
-  esp_err_t err = esp_http_client_perform(http_client);
-
-  if (err == ESP_OK) {
-    Serial.print("esp_http_client_get_status_code: ");
-    Serial.println(esp_http_client_get_status_code(http_client));
-  }
-
-  esp_http_client_cleanup(http_client);
-
-  free(clientBuf); // gotta free those megabytes
-  return 1;
+  Serial.println("back to the loop");
+  //return 1;
 }
 
 int send_motion()
