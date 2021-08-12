@@ -74,12 +74,13 @@ const char *ssid_alt = "";
 const char *password_alt = "";
 const char *status_str = "aqua_pir";
 
-const char *post_url = "http://site/in.php?pic=motion_detect"; // Location where images are POSTED
-const char *status_url = "http://site/in.php?pic=status";
-const char *orders_url = "http://site/in.php?pic=orders";
-const char *motion_url = "http://site/in.php?pic=motion_debug";
-const char *bg_url = "http://site/in.php?pic=motion_debug_bg";
-const char *led_url = "http://site/in.php?pic=led";
+const char *post_url = "http://site/in.php?pic=motion_detect&id=cam"; // Location where images are POSTED
+const char *mjpeg_url = "http://somesite.com/in.php?pic=mjpeg&id=cam";
+const char *status_url = "http://site/in.php?pic=status&id=cam";
+const char *orders_url = "http://site/in.php?pic=orders&id=cam";
+const char *motion_url = "http://site/in.php?pic=motion_debug&id=cam";
+const char *bg_url = "http://site/in.php?pic=motion_debug_bg&id=cam";
+const char *led_url = "http://site/in.php?pic=led&id=cam";
 
 
 #define CAMERA_MODEL_AI_THINKER
@@ -962,3 +963,4 @@ void loop() {
     timer_orders = millis();
   }
 #endif
+}
