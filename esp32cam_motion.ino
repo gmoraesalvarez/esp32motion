@@ -72,7 +72,8 @@ const char *ssid = "";
 const char *password = "";
 const char *ssid_alt = "";
 const char *password_alt = "";
-const char *status_str = "aqua_pir";
+const char *status_str = "cam";
+const char *hostname = "cam";
 
 const char *post_url = "http://site/in.php?pic=motion_detect&id=cam"; // Location where images are POSTED
 const char *mjpeg_url = "http://somesite.com/in.php?pic=mjpeg&id=cam";
