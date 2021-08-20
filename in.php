@@ -4,8 +4,8 @@
 ini_set("error_log", "php-error.txt");
 error_reporting(E_ALL);
 // Telegram function which you can call
-$bot = "1415075521:AAFzINhS2Yr0u5FdSv6prUbHLdBSpidVmGE";
-$chat_id = "249021960";
+$bot = "1415075521:##################################";
+$chat_id = "249#####";
 
 function telegram($msg,$img,$telegram_bot,$telegram_chat_id) {
         $url='https://api.telegram.org/bot'.$telegram_bot.'/sendMessage';
@@ -32,13 +32,13 @@ function dayly_stuff(){
 }
 
 
-function black_pic_detect(){
+function black_pic_detect($imgblob){
     $id = 'aqua_0';
 	if ( isset($_GET['id']) ){ $id = $_GET['id']; }
-    $received = file_get_contents('php://input');
+    //$received = file_get_contents('php://input');
     $darkcount = 0;
     $im = new Imagick();
-	if ($im->readImageBlob($received)){
+	if ($im->readImageBlob($imgblob)){
         file_put_contents("status.txt","opened an image from $id\n",FILE_APPEND);
       	$it = $im->getPixelIterator(); 		  /* Get iterator */
       	foreach( $it as $row => $pixels ){      	/* Loop trough pixel rows */
@@ -91,14 +91,16 @@ function save_photo(){
 	//save_photo($received);
 	//echo "teste";
 	file_put_contents("data/$id.$timeNow.jpg",$received);
-	telegram ($subject,"http://moraesalvarez.com/aquariuscam/data/$id.$timeNow.jpg",$bot,$chat_id);
+	telegram ($subject,"http://moraesalvarez.com/bolaxacam/data/$id.$timeNow.jpg",$bot,$chat_id);
 }
 
 function save_mjpeg(){
+    //echo $novar;
     $id = 'aqua_0';
 	if ( isset($_GET['id']) ){ $id = $_GET['id']; }
-    $bot = "1415075521:AAFzINhS2Yr0u5FdSv6prUbHLdBSpidVmGE";
-	$chat_id = "249021960";
+    file_put_contents("status.txt","opened an avi from $id\n",FILE_APPEND);
+    $bot = "1415075521:##########################";
+	$chat_id = "2490########";
 
 	$timeNow = get_time("Y-j-F.h_i_s");
 	$timeNow_ = get_time("Y j F h:i:s\n");
@@ -112,19 +114,19 @@ function save_mjpeg(){
 	send_file_to_apache_dumb_server("data/$id.$timeNow.avi");
 
 	$subject = "$id Mexeu - ".$timeNow."\n";
-	telegram($subject,"http://moraesalvarez.com/aquariuscam/data/$id.$timeNow.avi",$bot,$chat_id);
+	telegram($subject,"http://yoursite.com/esp32motion/data/$id.$timeNow.avi",$bot,$chat_id);
 }
 
 function send_file_to_apache_dumb_server($the_file){
-	//$url = 'http://moraesalvarez.com/aquariuscam/in.php?pic=avi&id=aquariusvpn';
+	//$url = 'http://moraesalvarez.com/bolaxacam/in.php?pic=avi&id=bolaxavpn';
 	$timeNow_ = get_time("Y j F h:i:s\n");
 	// set up basic connection
-	$ftp_server = "moraesalvarez.com";
+	$ftp_server = "yoursite.com";
 	$conn_id = ftp_connect($ftp_server); 
 
 	// login with username and password
-	$ftp_user_name = "moraesalvarez@diogoschmidt.com.br";
-	$ftp_user_pass = "Meteoro505"; 
+	$ftp_user_name = "user@yoursite.com";
+	$ftp_user_pass = "12345"; 
 	$login_result = ftp_login($conn_id, $ftp_user_name, $ftp_user_pass); 
 
 	// check connection
@@ -134,10 +136,11 @@ function send_file_to_apache_dumb_server($the_file){
 		exit; 
 	} else {
 		file_put_contents("status.txt",$timeNow_." --> Connected to $ftp_server, for user $ftp_user_name\n",FILE_APPEND);
+        ftp_pasv($conn_id, true);
 	}
 
 	// upload the file
-	$destination_file = "/aquariuscam/$the_file";
+	$destination_file = "/esp32motion/$the_file";
 	//$fp = fopen($the_file, 'r');
 	$upload = ftp_put($conn_id, $destination_file, $the_file, FTP_BINARY); 
 
@@ -193,15 +196,19 @@ function send_led(){
 dayly_stuff();
 
 if ($_GET['pic'] == 'motion_detect'){
-    if (black_pic_detect() == false){
+    if (black_pic_detect(file_get_contents('php://input')) == false){
       save_photo();
     }
     //save_photo();
 }
 if ($_GET['pic'] == 'mjpeg'){
-    //if (black_pic_detect() == false){
+  	$received = file_get_contents('php://input');
+  	$eof = "\xFF\xD9";
+  	$end_of_first_jpeg = strpos($received,$eof) + 2;
+	$first_frame = substr($received, 8, -$end_of_first_jpeg);
+	if (black_pic_detect($first_frame) == false){
       save_mjpeg();
-    //}
+    }
     //save_photo();
 }
 if ($_GET['pic'] == 'status'){
@@ -235,8 +242,8 @@ if ($_GET['pic'] == 'led'){
 ini_set("error_log", "php-error.txt");
 error_reporting(E_ALL);
 // Telegram function which you can call
-$bot = "1415075521:AAFzINhS2Yr0u5FdSv6prUbHLdBSpidVmGE";
-$chat_id = "249021960";
+$bot = "1415075521:asfasdfasdf";
+$chat_id = "asdfsdfasdf";
 //$id = $_GET['id'];
 
 function telegram($msg,$img,$telegram_bot,$telegram_chat_id) {
@@ -259,8 +266,8 @@ function get_time($format){
 }
 
 function save_photo(){
-    $bot = "1415075521:AAFzINhS2Yr0u5FdSv6prUbHLdBSpidVmGE";
-	$chat_id = "249021960";
+    $bot = "1415075521:asdfasdf";
+	$chat_id = "249asdsadf";
     $received = file_get_contents('php://input');
 	//$received_get = $_GET["pic"];
 	$timeNow = get_time("Y-m-d-h_i_s");
@@ -270,7 +277,7 @@ function save_photo(){
 	//save_photo($received);
 	//echo "teste";
 	echo file_put_contents("data/".$timeNow.'.jpg',$received);
-	echo telegram ($subject,'http://moraesalvarez.com/aquariuscam/data/'.$timeNow.'.jpg',$bot,$chat_id);
+	echo telegram ($subject,'http://sdfsdf.com/asdfsadf/data/'.$timeNow.'.jpg',$bot,$chat_id);
 }
 
 function save_motion(){
