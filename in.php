@@ -4,8 +4,9 @@
 ini_set("error_log", "php-error.txt");
 error_reporting(E_ALL);
 // Telegram function which you can call
-$bot = "1415075521:##################################";
-$chat_id = "249#####";
+$bot = "1415075521:asdasd";
+$chat_id = "asdasd";
+$site = "http://site.com/esp32motion";
 
 function telegram($msg,$img,$telegram_bot,$telegram_chat_id) {
         $url='https://api.telegram.org/bot'.$telegram_bot.'/sendMessage';
@@ -80,8 +81,8 @@ function get_time($format){
 function save_photo(){
     $id = 'aqua_0';
 	if ( isset($_GET['id']) ){ $id = $_GET['id']; }
-    $bot = "1415075521:AAFzINhS2Yr0u5FdSv6prUbHLdBSpidVmGE";
-	$chat_id = "249021960";
+    $bot = "1415075521:asdf";
+	$chat_id = "asdf";
     $received = file_get_contents('php://input');
 	//$received_get = $_GET["pic"];
 	$timeNow = get_time("Y-j-F.h_i_s");
@@ -91,7 +92,7 @@ function save_photo(){
 	//save_photo($received);
 	//echo "teste";
 	file_put_contents("data/$id.$timeNow.jpg",$received);
-	telegram ($subject,"http://moraesalvarez.com/bolaxacam/data/$id.$timeNow.jpg",$bot,$chat_id);
+	telegram ($subject,"$site/data/$id.$timeNow.jpg",$bot,$chat_id);
 }
 
 function save_mjpeg(){
@@ -99,8 +100,8 @@ function save_mjpeg(){
     $id = 'aqua_0';
 	if ( isset($_GET['id']) ){ $id = $_GET['id']; }
     file_put_contents("status.txt","opened an avi from $id\n",FILE_APPEND);
-    $bot = "1415075521:##########################";
-	$chat_id = "2490########";
+    $bot = "1415075521:asdf";
+	$chat_id = "asdf";
 
 	$timeNow = get_time("Y-j-F.h_i_s");
 	$timeNow_ = get_time("Y j F h:i:s\n");
@@ -114,18 +115,18 @@ function save_mjpeg(){
 	send_file_to_apache_dumb_server("data/$id.$timeNow.avi");
 
 	$subject = "$id Mexeu - ".$timeNow."\n";
-	telegram($subject,"http://yoursite.com/esp32motion/data/$id.$timeNow.avi",$bot,$chat_id);
+	telegram($subject,"$site/data/$id.$timeNow.avi",$bot,$chat_id);
 }
 
 function send_file_to_apache_dumb_server($the_file){
 	//$url = 'http://moraesalvarez.com/bolaxacam/in.php?pic=avi&id=bolaxavpn';
 	$timeNow_ = get_time("Y j F h:i:s\n");
 	// set up basic connection
-	$ftp_server = "yoursite.com";
+	$ftp_server = "site.com";
 	$conn_id = ftp_connect($ftp_server); 
 
 	// login with username and password
-	$ftp_user_name = "user@yoursite.com";
+	$ftp_user_name = "user@site.com.br";
 	$ftp_user_pass = "12345"; 
 	$login_result = ftp_login($conn_id, $ftp_user_name, $ftp_user_pass); 
 
@@ -140,7 +141,7 @@ function send_file_to_apache_dumb_server($the_file){
 	}
 
 	// upload the file
-	$destination_file = "/esp32motion/$the_file";
+	$destination_file = "/bolaxacam/$the_file";
 	//$fp = fopen($the_file, 'r');
 	$upload = ftp_put($conn_id, $destination_file, $the_file, FTP_BINARY); 
 
@@ -229,115 +230,5 @@ if ($_GET['pic'] == 'motion_debug_bg'){
 if ($_GET['pic'] == 'led'){
     send_led();
 }
-//function save_photo(data){
-//   		if (file_put_contents('teste.jpg.txt',$received) == false){
-//    		echo 'falha';
-//		}else {echo 'saved ';}
-//	}
-//}
 
-
-
-/*
-ini_set("error_log", "php-error.txt");
-error_reporting(E_ALL);
-// Telegram function which you can call
-$bot = "1415075521:asfasdfasdf";
-$chat_id = "asdfsdfasdf";
-//$id = $_GET['id'];
-
-function telegram($msg,$img,$telegram_bot,$telegram_chat_id) {
-        $url='https://api.telegram.org/bot'.$telegram_bot.'/sendMessage';
-    	$data=array('chat_id'=>$telegram_chat_id,'text'=>$msg.$img);
-		//$url='https://api.telegram.org/bot'.$telegram_bot.'/sendPhoto';
-    	//$data=array('chat_id'=>$telegram_chat_id,'photo'=>$img,'caption'=>$msg);
-        $options=array('http'=>array('method'=>'POST','header'=>"Content-Type:application/x-www-form-urlencoded\r\n",'content'=>http_build_query($data),),);
-    	$context=stream_context_create($options);
-        $result=file_get_contents($url,false,$context);
-        return $result;
-}
-
-function get_time($format){
-    $tz = 'America/Sao_Paulo';
-	$timestamp = time();
-	$dt = new DateTime("now", new DateTimeZone($tz)); //first argument "must" be a string
-	$dt->setTimestamp($timestamp); //adjust the object to correct timestamp
-	return $dt->format($format);
-}
-
-function save_photo(){
-    $bot = "1415075521:asdfasdf";
-	$chat_id = "249asdsadf";
-    $received = file_get_contents('php://input');
-	//$received_get = $_GET["pic"];
-	$timeNow = get_time("Y-m-d-h_i_s");
-	$timeNow_ = get_time("Y m d h:i:s\n");
-	echo $timeNow;
-	$subject = "Aquarius Mexeu - ".$timeNow."\n";
-	//save_photo($received);
-	//echo "teste";
-	echo file_put_contents("data/".$timeNow.'.jpg',$received);
-	echo telegram ($subject,'http://sdfsdf.com/asdfsadf/data/'.$timeNow.'.jpg',$bot,$chat_id);
-}
-
-function save_motion(){
-	$received = file_get_contents('php://input');
-	$timeNow = get_time("Y-m-d-h_i_s");
-    $head = explode("\n", $received, 2);
-	echo file_put_contents("data/motion.".$head[0].'.'.$timeNow.'.txt',$received);
-}
-
-function save_bg(){
-	$received = file_get_contents('php://input');
-	$timeNow = get_time("Y-m-d-h_i_s");
-    $head = explode("\n", $received, 2);
-	echo file_put_contents("data/bg.".$head[0].'.'.$timeNow.'.txt',$received);
-}
-
-function save_status(){
-	$received = file_get_contents('php://input');
-	$timeNow_ = get_time("Y F d h:i:s\n");
-	echo file_put_contents("status.txt",$timeNow_.' --> '.$received."\n",FILE_APPEND);
-}
-
-function send_orders(){
-    $config = "SLP";
-    $config = file_get_contents("current_orders.txt",false);
-	echo $config;
-}
-function send_led(){
-    $led = "NLE";
-    $led = file_get_contents("led.txt",false);
-	echo $led;
-}
-
-if ($_GET['pic'] == 'motion_detect'){
-    save_photo();
-}
-
-if ($_GET['pic'] == 'status'){
-    save_status();
-}
-
-if ($_GET['pic'] == 'orders'){
-    send_orders();
-}
-
-if ($_GET['pic'] == 'motion_debug'){
-    save_motion();
-}
-
-if ($_GET['pic'] == 'motion_debug_bg'){
-    save_bg();
-}
-if ($_GET['pic'] == 'led'){
-    send_led();
-}
-//function save_photo(data){
-//   		if (file_put_contents('teste.jpg.txt',$received) == false){
-//    		echo 'falha';
-//		}else {echo 'saved ';}
-//	}
-//}
-*/
 ?>
