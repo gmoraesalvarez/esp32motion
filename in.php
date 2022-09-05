@@ -1,12 +1,12 @@
-<?php
+<?
+
 //ini_set('display_errors', 1);
 //ini_set('display_startup_errors', 1);
 ini_set("error_log", "php-error.txt");
 error_reporting(E_ALL);
 // Telegram function which you can call
-$bot = "1415075521:asdasd";
-$chat_id = "asdasd";
-$site = "http://site.com/esp32motion";
+$bot = "";
+$chat_id = "";
 
 function telegram($msg,$img,$telegram_bot,$telegram_chat_id) {
         $url='https://api.telegram.org/bot'.$telegram_bot.'/sendMessage';
@@ -21,6 +21,10 @@ function telegram($msg,$img,$telegram_bot,$telegram_chat_id) {
 
 // dayly routines
 function dayly_stuff(){
+	$files1 = array_reverse(glob('data' . '*.{avi}', GLOB_BRACE));
+	foreach($files1 as $key => $value){
+        unlink($value);
+	}
     $timeNow = get_time("Y-m-d");
     if (file_exists("data_$timeNow") == false){
         rename('data',"data_$timeNow");
@@ -33,13 +37,13 @@ function dayly_stuff(){
 }
 
 
-function black_pic_detect($imgblob){
+function black_pic_detect(){
     $id = 'aqua_0';
 	if ( isset($_GET['id']) ){ $id = $_GET['id']; }
-    //$received = file_get_contents('php://input');
+    $received = file_get_contents('php://input');
     $darkcount = 0;
     $im = new Imagick();
-	if ($im->readImageBlob($imgblob)){
+	if ($im->readImageBlob($received)){
         file_put_contents("status.txt","opened an image from $id\n",FILE_APPEND);
       	$it = $im->getPixelIterator(); 		  /* Get iterator */
       	foreach( $it as $row => $pixels ){      	/* Loop trough pixel rows */
@@ -65,11 +69,6 @@ function black_pic_detect($imgblob){
     }
 }
 
-function mix_video($audio_file, $img_file, $video_file) {
-    $mix = "ffmpeg -loop_input -i " . $img_file . " -vcodec mpeg4 -s 1024x768 -b 10k -r 1 -shortest " . $video_file;
-    exec($mix);
-}
-
 function get_time($format){
     $tz = 'America/Sao_Paulo';
 	$timestamp = time();
@@ -81,53 +80,52 @@ function get_time($format){
 function save_photo(){
     $id = 'aqua_0';
 	if ( isset($_GET['id']) ){ $id = $_GET['id']; }
-    $bot = "1415075521:asdf";
-	$chat_id = "asdf";
+    $bot = "";
+	$chat_id = "";
     $received = file_get_contents('php://input');
 	//$received_get = $_GET["pic"];
-	$timeNow = get_time("Y-j-F.h_i_s");
-	$timeNow_ = get_time("Y j F h:i:s\n");
+	$timeNow = get_time("Y-j-F.H_i_s");
+	$timeNow_ = get_time("Y j F H:i:s\n");
 	//echo $timeNow;
 	$subject = "$id Mexeu - ".$timeNow."\n";
 	//save_photo($received);
 	//echo "teste";
 	file_put_contents("data/$id.$timeNow.jpg",$received);
-	telegram ($subject,"$site/data/$id.$timeNow.jpg",$bot,$chat_id);
+	telegram ($subject,"http://site.com/data/$id.$timeNow.jpg",$bot,$chat_id);
 }
 
 function save_mjpeg(){
-    //echo $novar;
     $id = 'aqua_0';
 	if ( isset($_GET['id']) ){ $id = $_GET['id']; }
-    file_put_contents("status.txt","opened an avi from $id\n",FILE_APPEND);
-    $bot = "1415075521:asdf";
-	$chat_id = "asdf";
+    	$bot = "";
+	$chat_id = "";
 
-	$timeNow = get_time("Y-j-F.h_i_s");
-	$timeNow_ = get_time("Y j F h:i:s\n");
+	$timeNow = get_time("Y-j-F.H_i_s");
+	$timeNow_ = get_time("Y j F H:i:s\n");
 
     $received = file_get_contents('php://input');
 	$aviheader= substr($received, -240);
 	$avibody = substr($received, 0, -240);
 	$avifile = $aviheader.$avibody;
-	file_put_contents("data/$id.$timeNow.avi", $avifile);
+	file_put_contents("data/$timeNow.$id.avi", $avifile);
 
-	send_file_to_apache_dumb_server("data/$id.$timeNow.avi");
+	shell_exec("nohup ffmpeg -i data/$timeNow.$id.avi -c:v libx264 -preset veryfast -profile:v main -vf format=yuv420p -b:v 1500k data/z.$timeNow.$id.mp4");
+
+	//send_file_to_apache_dumb_server("data/z.$timeNow.$id.mp4");
 
 	$subject = "$id Mexeu - ".$timeNow."\n";
-	telegram($subject,"$site/data/$id.$timeNow.avi",$bot,$chat_id);
+	telegram($subject,"http://site.com/list.php",$bot,$chat_id);
 }
 
 function send_file_to_apache_dumb_server($the_file){
-	//$url = 'http://moraesalvarez.com/bolaxacam/in.php?pic=avi&id=bolaxavpn';
-	$timeNow_ = get_time("Y j F h:i:s\n");
+	$timeNow_ = get_time("Y j F H:i:s\n");
 	// set up basic connection
-	$ftp_server = "site.com";
+	$ftp_server = "";
 	$conn_id = ftp_connect($ftp_server); 
 
 	// login with username and password
-	$ftp_user_name = "user@site.com.br";
-	$ftp_user_pass = "12345"; 
+	$ftp_user_name = "";
+	$ftp_user_pass = "";
 	$login_result = ftp_login($conn_id, $ftp_user_name, $ftp_user_pass); 
 
 	// check connection
@@ -137,11 +135,10 @@ function send_file_to_apache_dumb_server($the_file){
 		exit; 
 	} else {
 		file_put_contents("status.txt",$timeNow_." --> Connected to $ftp_server, for user $ftp_user_name\n",FILE_APPEND);
-        ftp_pasv($conn_id, true);
 	}
 
 	// upload the file
-	$destination_file = "/bolaxacam/$the_file";
+	$destination_file = "/$the_file";
 	//$fp = fopen($the_file, 'r');
 	$upload = ftp_put($conn_id, $destination_file, $the_file, FTP_BINARY); 
 
@@ -161,8 +158,8 @@ function save_motion(){
     $id = 'aqua_0';
 	if ( isset($_GET['id']) ){ $id = $_GET['id']; }
 	$received = file_get_contents('php://input');
-	$timeNow = get_time("Y-j-F.h_i_s");
-	$timeNow_ = get_time("Y j F h:i:s\n");
+	$timeNow = get_time("Y-j-F.H_i_s");
+	$timeNow_ = get_time("Y j F H:i:s\n");
 	file_put_contents("data/$id.motion.".$timeNow.'.txt',$received);
 }
 
@@ -170,8 +167,8 @@ function save_bg(){
     $id = 'aqua_0';
 	if ( isset($_GET['id']) ){ $id = $_GET['id']; }
 	$received = file_get_contents('php://input');
-	$timeNow = get_time("Y-j-F.h_i_s");
-	$timeNow_ = get_time("Y j F h:i:s\n");
+	$timeNow = get_time("Y-j-F.H_i_s");
+	$timeNow_ = get_time("Y j F H:i:s\n");
 	file_put_contents("data/$id.bg.".$timeNow.'.txt',$received);
 }
 
@@ -179,8 +176,10 @@ function save_status(){
     $id = 'aqua_0';
 	if ( isset($_GET['id']) ){ $id = $_GET['id']; }
 	$received = file_get_contents('php://input');
-	$timeNow_ = get_time("Y j F h:i:s\n");
+	$timeNow_ = get_time("Y j F H:i:s\n");
 	file_put_contents("status.txt",$timeNow_.' --> '.$id.$received."\n",FILE_APPEND);
+	$timeNow__ = get_time("Y-m-d\TH:i:sP");
+	file_put_contents("cam_status/".$id.".txt",$timeNow__);
 }
 
 function send_orders(){
@@ -197,19 +196,15 @@ function send_led(){
 dayly_stuff();
 
 if ($_GET['pic'] == 'motion_detect'){
-    if (black_pic_detect(file_get_contents('php://input')) == false){
+    if (black_pic_detect() == false){
       save_photo();
     }
     //save_photo();
 }
 if ($_GET['pic'] == 'mjpeg'){
-  	$received = file_get_contents('php://input');
-  	$eof = "\xFF\xD9";
-  	$end_of_first_jpeg = strpos($received,$eof) + 2;
-	$first_frame = substr($received, 8, -$end_of_first_jpeg);
-	if (black_pic_detect($first_frame) == false){
+    //if (black_pic_detect() == false){
       save_mjpeg();
-    }
+    //}
     //save_photo();
 }
 if ($_GET['pic'] == 'status'){
@@ -230,5 +225,3 @@ if ($_GET['pic'] == 'motion_debug_bg'){
 if ($_GET['pic'] == 'led'){
     send_led();
 }
-
-?>
