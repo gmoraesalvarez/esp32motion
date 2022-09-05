@@ -1,0 +1,7 @@
+html {font-family:sans-serif;margin:auto;text-align:center;background:#fafafa;}
+a {font-size:16px;text-decoration:none;background:#545454;color:#fafafa;padding:10px;border-radius:3px;display:inline-block;
+	margin:10px;width:200px;text-align:center;}
+.info {font-size:12px;text-decoration:none;color:#fafafa;padding:4px;border-radius:3px;display:inline-block;
+	margin:10px;text-align:center;}
+.configs {font-size:14px;margin-top:50px; color:#fafafa; border-radius:2px; background:#BF360C}
+.configs a{font-size:13px;width:22px;text-align:center;}
