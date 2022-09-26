@@ -34,7 +34,7 @@
         <a href="javascript:void(0)" onclick="set_orders(0)" id="slp">desativar</a>
         <a href="javascript:void(0)" onclick="set_orders(1)" id="mdt">detectar movimento</a>
         <a href="javascript:void(0)" onclick="set_orders(2)" id="pic">enviar fotos</a>
-        <a href="javascript:void(0)" onclick="set_led()" id="led">LUZ</a>
+        <a href="javascript:void(0)" onclick="set_led()" id="led">desativar sensor PIR</a>
         <div class="configs" id="configs">
             <div>
                 BG Timer Limit
