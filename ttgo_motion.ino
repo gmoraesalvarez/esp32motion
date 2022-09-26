@@ -13,11 +13,9 @@ int orders_limit = 10000;
 int timer_bg = millis();
 int timer_status = millis();
 int timer_orders = millis();
-String prev_frame_s = "";
-String cur_frame_s = "";
 int program = 1;
 //// send_clip variables reused across loops and global to avoid stack smashing error
-int megabytes = 1024*1024*8;   // max file size (has to fit psram if sending full clip)
+int megabytes = 1024*1024*16;   // max file size (has to fit psram if sending full clip)
 uint8_t* clientBuf[500];
 uint8_t* idxBuf[5000];
 int frameCnt = 0;
@@ -28,59 +26,76 @@ word idxbufSize = 0;
 word jpegSize[maxframeCnt]; // this array will store the size of each frame
 
 
+#if defined(ESP32)
+  #define USE_SPIFFS            true
+  #define ESP_DRD_USE_EEPROM    true
+#else  
+  #error This code is intended to run on the ESP32 platform! Please check your Tools->Board setting.  
+#endif
+#include <ESP_WiFiManager.h>                    //https://github.com/khoih-prog/ESP_WiFiManager
+#define DRD_TIMEOUT             2
+#define DRD_ADDRESS             0
+#include <ESP_DoubleResetDetector.h>            //https://github.com/khoih-prog/ESP_DoubleResetDetector
+DoubleResetDetector* drd;
+bool      initialConfig = false;
 
-
-//Replace with your network credentials
-const char *ssid = "mynetwork";
-const char *password = "abcd";
-const char *ssid_alt = "myothernetwork";
-const char *password_alt = "abcde";
 const char *status_str = "cam_ttgo";
 
-const char *post_url = "http://somesite.com/in.php?pic=motion_detect&id=cam_ttgo"; // Location where images are POSTED
-const char *mjpeg_url = "http://somesite.com/in.php?pic=mjpeg&id=cam_ttgo";
-const char *status_url = "http://somesite.com/in.php?pic=status";
-const char *orders_url = "http://somesite.com/in.php?pic=orders";
-const char *motion_url = "http://somesite.com/in.php?pic=motion_debug";
-const char *bg_url = "http://somesite.com/in.php?pic=motion_debug_bg";
-const char *led_url = "http://somesite.com/in.php?pic=led";
+const char *post_url = "http://storageserver.com/in.php?pic=motion_detect&id=cam_ttgo"; // Location where images are POSTED
+const char *mjpeg_url = "http://storageserver.com/in.php?pic=mjpeg&id=cam_ttgo";
+const char *status_url = "http://commandserver.com/in.php?pic=status&id=cam_ttgo";
+const char *orders_url = "http://commandserver.com/in.php?pic=orders&id=cam_ttgo";
+const char *motion_url = "http://commandserver.com/in.php?pic=motion_debug&id=cam_ttgo";
+const char *bg_url = "http://commandserver.com/in.php?pic=motion_debug_bg&id=cam_ttgo";
+const char *led_url = "http://commandserver.com/in.php?pic=led&id=cam_ttgo";
 
 
 OV2640 cam;
 
 void setup()
 {
-  Serial.begin(115200);
   gpio_install_isr_service(0);
   u8x8.begin();
   u8x8.setFont(u8x8_font_5x7_f);
   //u8x8.setFont(u8x8_font_amstrad_cpc_extended_r);
 
-
   pinMode(PIR_PIN, INPUT); //pir
 
   cam.init(esp32cam_ttgo_t_config);
 
-  // Wi-Fi connection
-  Serial.printf("connecting to %s\n",ssid);
-  Serial.println(WiFi.macAddress());
-  WiFi.begin(ssid, password);
-  WiFi.setSleep(false);
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
+  u8x8.clear();
+  u8x8.setCursor(1, 1);
+  u8x8.print("wifi setup");
+  Serial.begin(115200); while (!Serial); delay(200);
+  Serial.print(F("\nStarting ConfigOnDoubleReset_minimal on ")); Serial.println(ARDUINO_BOARD);
+  Serial.println(ESP_WIFIMANAGER_VERSION); 
+  drd = new DoubleResetDetector(DRD_TIMEOUT, DRD_ADDRESS);
+  if (drd->detectDoubleReset()) { Serial.println(F("DRD")); initialConfig = true; }
+  ESP_WiFiManager ESP_wifiManager("ConfigOnDoubleReset");
+  if (ESP_wifiManager.WiFi_SSID() == "") { Serial.println(F("No AP credentials")); initialConfig = true; }
+  if (initialConfig) {
+    u8x8.clear();
+    u8x8.setCursor(1, 1);
+    u8x8.print("CONFIG PORTAL");
+    Serial.println(F("Starting Config Portal")); 
+    if (!ESP_wifiManager.startConfigPortal()) { Serial.println(F("Not connected to WiFi")); u8x8.clear(); u8x8.setCursor(1, 5); u8x8.print("CONN ERR"); }
+    else { Serial.println(F("connected")); u8x8.clear(); u8x8.setCursor(1, 5); u8x8.print("CONN OK"); }
   }
+  else { WiFi.mode(WIFI_STA); WiFi.begin(); } 
+  unsigned long startedAt = millis();
+  Serial.print(F("After waiting "));
+  int connRes = WiFi.waitForConnectResult();
+  float waited = (millis() - startedAt);
+  Serial.print(waited / 1000); Serial.print(F(" secs , Connection result is ")); Serial.println(connRes);
+  if (WiFi.status() != WL_CONNECTED) { Serial.println(F("Failed to connect")); }
+  else { Serial.print(F("Local IP: ")); Serial.println(WiFi.localIP()); u8x8.clear(); u8x8.setCursor(1, 5); u8x8.print(WiFi.localIP());}
 
-  Serial.println("");
-  Serial.println("WiFi connected");
 
-  Serial.print(WiFi.localIP());
-  Serial.println("");
-
-  status_notify();
+  Serial.println("Notify");
+  status_notify(); 
 }
 
-int check_orders() {
+void check_orders() {
   esp_http_client_handle_t http_client;
 
   esp_http_client_config_t config_client = {0};
@@ -90,7 +105,7 @@ int check_orders() {
 
   http_client = esp_http_client_init(&config_client);
 
-  esp_http_client_set_post_field(http_client, status_str, 16);
+  esp_http_client_set_post_field(http_client, status_str, 8);
 
   esp_http_client_set_header(http_client, "Content-Type", "text/plain");
 
@@ -102,9 +117,10 @@ int check_orders() {
   }
 
   esp_http_client_cleanup(http_client);
+  Serial.println("Checked orders");
 }
 
-int status_notify() {
+void status_notify() {
   esp_http_client_handle_t http_client;
 
   esp_http_client_config_t config_client = {0};
@@ -126,9 +142,10 @@ int status_notify() {
   }
 
   esp_http_client_cleanup(http_client);
+  Serial.println("Finish notify");
 }
 
-int process_orders(String orders){
+void process_orders(String orders){
     Serial.printf("program was %d \n", program);
     String COMMAND = orders.substring(0, 3);
     String LED = orders.substring(4, 7);
@@ -166,11 +183,12 @@ int process_orders(String orders){
       }
     } else { Serial.println("Not an ORDERS string."); }
     Serial.printf("program is now %d \n", program);
+    u8x8.clear(); u8x8.setCursor(1, 5); u8x8.print("PROG"); u8x8.setCursor(7, 5); u8x8.print(program);
 }
 
 esp_err_t _http_event_handler(esp_http_client_event_t *evt)
 {
-  String str = "";
+  String str = "__________________________________";
   switch (evt->event_id) {
     case HTTP_EVENT_ERROR:
       Serial.println("HTTP_EVENT_ERROR");
@@ -190,7 +208,8 @@ esp_err_t _http_event_handler(esp_http_client_event_t *evt)
       Serial.printf("HTTP_EVENT_ON_DATA, len=%d", evt->data_len);
       printf("%.*s \n", evt->data_len, (char*)evt->data);
       
-      str += (char*)evt->data;
+      str = (char*)evt->data;
+      Serial.println("got data from the server:");
       Serial.println(str);
 
       process_orders(str);
@@ -258,16 +277,16 @@ void send_clip()
 
   int headroom = 200000;
   frameCnt = 0; // gotta reset this too
-  const char* dwFourCC = "00db";  // this and the frame size in bytes goes in between every frame
+  const char* dwFourCC = "00db";  // this and the frame size in bytes goes in before every frame
   char chunk_size_char[16];
+  //char http_msg[30];
   Serial.println("capturing");
   for (int i = 0;i < maxframeCnt; i++){
     frameCnt++;
 
     cam.run();
-
     jpegSize[i] = cam.getSize();
-    
+    //fileSize += 8;
     esp_http_client_write(chunk_client,"4", 1); // length
     esp_http_client_write(chunk_client,"\r\n", 2);
     esp_http_client_write(chunk_client, dwFourCC, 4); // data
@@ -282,13 +301,14 @@ void send_clip()
     //Serial.print("sent length: ");
     //Serial.println((char*)&jpegSize[i]);
     fileSize += 4;
-
     sprintf(chunk_size_char,"%08X",jpegSize[i]);
     //Serial.println(jpegSize[i]);
     //Serial.print("format size: ");
-    //Serial.println(chunk_size_char);
+    //Serial.println(chunk_size_char);     
     esp_http_client_write(chunk_client,chunk_size_char, 8); // length
     esp_http_client_write(chunk_client,"\r\n", 2);
+
+
     esp_http_client_write(chunk_client,(char*)cam.getfb(), jpegSize[i]); // data   , 
     esp_http_client_write(chunk_client,"\r\n", 2);
     Serial.print("sent frame: ");
@@ -349,7 +369,7 @@ void send_clip()
   memcpy(clientBuf+140, &dwTotalFrames, 4);
   memcpy(clientBuf+168, &jpgs_width, 4);
   memcpy(clientBuf+172, &jpgs_height, 4);
-  word biSizeImage = ((jpgs_width*24/8 + 3)&0xFFFFFFFC)*jpgs_height;
+  //word biSizeImage = ((jpgs_width*24/8 + 3)&0xFFFFFFFC)*jpgs_height;
   memcpy(clientBuf+184, &jpgs_height, 4);
   memcpy(clientBuf+224, &dwTotalFrames, 4);
   dwSize = fileSize - 232;
@@ -381,7 +401,7 @@ void send_clip()
   fileSize += idxbufSize;                         // this is part of that
 
   /// sending avi index chunk. this should end the file after the backend code moves the header to the head.
-  char chunk_indexsize_char[8];
+  char chunk_indexsize_char[9];
   sprintf(chunk_indexsize_char,"%08X", idxbufSize);
   esp_http_client_write(chunk_client,chunk_indexsize_char, 8); // length
   esp_http_client_write(chunk_client,"\r\n", 2);
@@ -390,7 +410,7 @@ void send_clip()
 
   /// sending the header chunk to the end of the file. Server side code will have to deal with
   /// putting it on the head
-  char chunk_headsize_char[8];
+  char chunk_headsize_char[9];
   sprintf(chunk_headsize_char,"%08X", 240); //header size is 240 bytes
   esp_http_client_write(chunk_client,chunk_headsize_char, 8); // length
   esp_http_client_write(chunk_client,"\r\n", 2);
@@ -421,111 +441,28 @@ void send_clip()
 
   u8x8.clear();
   u8x8.setCursor(1, 1);
-  u8x8.print("  ||\\\\        ");
+  u8x8.print("  vv        ");
   u8x8.setCursor(1, 2);
-  u8x8.print("  ||\\\\       ");
+  u8x8.print("  vvv       ");
   u8x8.setCursor(1, 3);
-  u8x8.print("  || \\\\      ");
+  u8x8.print("  vvv       ");
   u8x8.setCursor(1, 4);
-  u8x8.print("  || \\\\     ");
+  u8x8.print("  v vv      ");
   u8x8.setCursor(1, 5);
-  u8x8.print("  ||   \\\\   ");
+  u8x8.print("  v   vv    ");
   u8x8.setCursor(1, 6);
-  u8x8.print("  ||    \\\\ ");
+  u8x8.print("  v    vv   ");
   u8x8.setCursor(1, 7);
-  u8x8.print(" ||        \\\\");
+  u8x8.print(" v       vv ");
 
   Serial.println("back to the loop");
   //return 1;
 }
 
 
-static esp_err_t send_photo()
-{
-  Serial.println("Taking picture...");
-  //Serial.printf("Taking picture...", cam.getSize());
-  u8x8.clear();
-  u8x8.setCursor(1, 1);
-  u8x8.print("FOTOGRAFANDO");
-  
-  esp_err_t res = ESP_OK;
-  cam.run();
-  //cam.run();
-  //u8x8.setCursor(1, 2);
-  //u8x8.print("FOTO PRONTA");
-  //u8x8.setCursor(1, 3);
-  //u8x8.print("ENVIANDO...");
-  
-  esp_http_client_handle_t http_client;
-
-  esp_http_client_config_t config_client = {0};
-  config_client.url = post_url;
-  config_client.event_handler = _http_event_handler;
-  config_client.method = HTTP_METHOD_POST;
-  //u8x8.setCursor(1, 4);
-  //u8x8.print("_");
-  http_client = esp_http_client_init(&config_client);
-
-  esp_http_client_set_post_field(http_client, (char *)cam.getfb(), cam.getSize());
-
-  esp_http_client_set_header(http_client, "Content-Type", "image/jpg");
-
-  esp_err_t err = esp_http_client_perform(http_client);
-  //u8x8.setCursor(2, 4);
-  //u8x8.print("_");
-  if (err == ESP_OK) {
-    Serial.print("esp_http_client_get_status_code: ");
-    Serial.println(esp_http_client_get_status_code(http_client));
-  }
-  //u8x8.setCursor(3, 4);
-  //u8x8.print(">|");
-
-  esp_http_client_cleanup(http_client);
-  
-  u8x8.clear();
-  u8x8.setCursor(1, 4);
-  u8x8.print("FOTO ENVIADA");
-}
-
-void warning_screen()
-{
-  //u8x8.fillDisplay();
-  //u8x8.clear();
-  //u8x8.fillDisplay();
-  //u8x8.clear();
-
-  //u8x8.setCursor(6, 0);
-  //u8x8.print("STEP");
-  //delay(600);
-  //u8x8.setCursor(6, 2);
-  //u8x8.print("AWAY");
-  //delay(800);
-  //u8x8.setCursor(4, 4);
-  //u8x8.print("FROM");
-  //delay(500);
-  //u8x8.setCursor(9, 4);
-  //u8x8.print("THE");
-  //delay(500);
-  //u8x8.setCursor(5, 6);
-  //u8x8.print("FRIDGE");
-  //delay(1000);
-  //u8x8.clear();
-  //u8x8.setCursor(4, 1);
-  //u8x8.print("FOTOGRAFANDO");
-  //u8x8.setCursor(5, 7);
-  //u8x8.print("EM");
-  //delay(50);
-  //u8x8.setFont(u8x8_font_courB18_2x3_n);
-  //for (int s = 3; s > 0; s--) {
-    //u8x8.setCursor(7, 3);
-    //u8x8.print(s);
-    //delay(300);
-  //}
-}
-
 void loop()
 {
-
+  drd->loop();
   if (program == 1) {
     if (digitalRead(PIR_PIN)) { // If movement - Take photo
       //send_photo();
@@ -538,9 +475,9 @@ void loop()
     send_clip();
   }
   
-  if (program == 0) { // JUST SLEEP
+  //if (program == 0) { // JUST SLEEP
 
-  }
+  //}
   if ( (millis() - timer_status) > status_limit ) {
       u8x8.clear();
       Serial.println("Notify");
